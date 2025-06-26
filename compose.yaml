@@ -1,0 +1,71 @@
+# Raspberry Pi 5用 Minecraft Bedrock Edition サーバー構成
+# Nintendo Switch対応のマルチプレイ環境
+
+services:
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "80:80/tcp"
+      - "443:443/tcp"
+    environment:
+      TZ: "Asia/Tokyo"
+      FTLCONF_webserver_api_password: "correct horse battery staple"
+      FTLCONF_dns_listeningMode: "all"
+    volumes:
+      - "./etc-pihole:/etc/pihole"
+    cap_add:
+      - NET_ADMIN
+      - SYS_TIME
+      - SYS_NICE
+    restart: unless-stopped
+
+  # BedrockConnect Proxy: Nintendo Switch用プロキシサーバー
+  bedrock-connect:
+    container_name: bedrock-connect
+    image: pugmatt/bedrock-connect:latest
+    ports:
+      - "19132:19132/udp"
+    environment:
+      # カスタムサーバーリストを環境変数で定義
+      custom_servers: |
+        [
+          {
+            "name": "Pi5 Bedrock Server",
+            "address": "minecraft-bedrock-server",
+            "port": 19132
+          }
+        ]
+      # ユーザーによるサーバー追加を無効化
+      user_servers: "false"
+      # サーバー数制限
+      server_limit: "10"
+    restart: unless-stopped
+
+  # Minecraft Bedrock Server: 公式Bedrockサーバー
+  minecraft-bedrock-server:
+    container_name: minecraft-bedrock-server
+    image: itzg/minecraft-bedrock-server:latest
+    ports:
+      - "19133:19132/udp" # 外部アクセス用（オプション）
+    environment:
+      TZ: "Asia/Tokyo"
+      EULA: "TRUE"
+      VERSION: "LATEST"
+      SERVER_NAME: "Pi5 Bedrock"
+      LEVEL_NAME: "Bedrock level"
+      GAMEMODE: "survival"
+      DIFFICULTY: "normal"
+      MAX_PLAYERS: "10"
+      ALLOW_CHEATS: "false"
+      ONLINE_MODE: "false"
+    volumes:
+      - ./minecraft-data:/data
+    restart: unless-stopped
+
+# Dockerネットワーク（コンテナ間通信用）
+networks:
+  default:
+    driver: bridge
